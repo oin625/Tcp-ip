@@ -1,0 +1,105 @@
+;(function () {
+  function trackByGraylog(pathname) {
+    return function (param) {
+      var serverPath = window.location.protocol + "//statistic.csdn.net/";
+      $.get(serverPath + pathname, param);
+    };
+  }
+  var report = trackByGraylog('htmleditor');
+  function getCookieUser(name) {
+    var cookies = document.cookie;
+    var list = cookies.split('; ');
+    for (var i = 0; i < list.length; i += 1) {
+      var arr = list[i].split('=');
+      if (arr[0] === name) {
+        return decodeURIComponent(arr[1]);
+      }
+    }
+    return false;
+  }
+  function spliceData(_ref) {
+    var _ref$origin = _ref.origin,
+        origin = _ref$origin === undefined ? '' : _ref$origin,
+        _ref$error = _ref.error,
+        error = _ref$error === undefined ? '' : _ref$error,
+        _ref$info = _ref.info,
+        info = _ref$info === undefined ? '' : _ref$info,
+        _ref$url = _ref.url,
+        url = _ref$url === undefined ? '' : _ref$url,
+        _ref$config = _ref.config,
+        config = _ref$config === undefined ? null : _ref$config;
+
+    var errorStr = '';
+    if (error instanceof Error) {
+      errorStr = error.stack;
+    } else {
+      errorStr = JSON.stringify(error);
+    }
+    var data = {
+      origin: origin,
+      error: errorStr
+    };
+    if (config) {
+      data.config = JSON.stringify(config);
+    }
+    if (url) {
+      data.url = url;
+    }
+    if (info) {
+      data.info = info;
+    }
+    data.user = getCookieUser('UserName');
+    return data;
+  }
+  function windowErrorHandler(message, source, lineno, colno, error) {
+    report(spliceData({
+      origin: 'window.error',
+      error: {
+        error: error.stack,
+        filename: source,
+        line: lineno,
+        colno: colno
+      },
+      info: message,
+      url: source
+    }));
+  }
+
+  function listenerErrorHandler(e) {
+    var errorText = '';
+    var url = '';
+    if ((e.target.nodeName === 'SCRIPT' || e.target.nodeName === 'IMG' || e.target.nodeName === 'LINK') && e.target.src && window.location.href.indexOf(e.target.src) < 0) {
+      url = e.target.src;
+      errorText = '资源加载错误';
+      report(spliceData({
+        origin: 'addEventListenerError',
+        error: errorText,
+        url: url
+      }));
+    }
+  }
+
+  function requestError() {
+    var e = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var info = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+    var config = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+
+    if (config.url && config.url.indexOf(REPORTURL) > -1) return false;
+    report(spliceData({
+      origin: 'requestError',
+      error: e,
+      info: info,
+      config: config
+    }));
+    return false;
+  }
+  window.addEventListener('error', listenerErrorHandler, true);
+  window.onerror = windowErrorHandler;
+
+  window.csdn = window.csdn ? window.csdn : {};
+  window.csdn.csdnreport = {
+    requestError: requestError,
+    listenerErrorHandler: listenerErrorHandler,
+    windowErrorHandler: windowErrorHandler
+  };
+})();
